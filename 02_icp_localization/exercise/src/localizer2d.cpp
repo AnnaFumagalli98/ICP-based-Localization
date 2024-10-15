@@ -22,9 +22,29 @@ void Localizer2D::setMap(std::shared_ptr<Map> map_) {
    * Finally instantiate the KD-Tree (obst_tree_ptr) on the vector.
    */
   // TODO
+  //Check if the map is initialized and inizialization of rows and cols
+  if (_map && _map -> initialized()){
+    int rows = _map -> rows();
+    int cols = _map -> cols();
+    _obst_vect.clear();
 
+    for (size_t r = 0; r<rows; ++r){
+      for (size_t c = 0; c<cols; ++c){
+
+        //Check if it is an obstacle
+        if ((*_map)(r,c) == CellType::Occupied){
+          Eigen::Vector2f wp = _map -> grid2world(cv::Point2i(r,c));
+          _obst_vect.push_back(wp);
+        }
+        else {
+          continue;
+        }
+      }
+    }
+  }
   // Create KD-Tree
   // TODO
+  _obst_tree_ptr = std::make_shared<TreeType>(_obst_vect.begin(), _obst_vect.end());
 }
 
 /**
@@ -34,6 +54,7 @@ void Localizer2D::setMap(std::shared_ptr<Map> map_) {
  */
 void Localizer2D::setInitialPose(const Eigen::Isometry2f& initial_pose_) {
   // TODO
+  _laser_in_world = initial_pose_;
 }
 
 /**
@@ -45,6 +66,8 @@ void Localizer2D::setInitialPose(const Eigen::Isometry2f& initial_pose_) {
 void Localizer2D::process(const ContainerType& scan_) {
   // Use initial pose to get a synthetic scan to compare with scan_
   // TODO
+  ContainerType pred_scan;
+  getPrediction(pred_scan);
 
   /**
    * Align prediction and scan_ using ICP.
@@ -53,11 +76,20 @@ void Localizer2D::process(const ContainerType& scan_) {
    */
   // TODO
 
+  int min_points = 10;
+  int num_iter = 30;
+  ICP icp(pred_scan, scan_, min_points);
+  icp.X() = _laser_in_world;
+  icp.run(num_iter);
+
   /**
    * Store the solver result (X) as the new laser_in_world estimate
    *
    */
   // TODO
+
+  _laser_in_world = icp.X();
+  
 }
 
 /**
