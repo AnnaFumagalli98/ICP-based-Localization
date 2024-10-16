@@ -107,12 +107,22 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
    * [std::vector<Eigen::Vector2f, Eigen::aligned_allocator<Eigen::Vector2f>>]
    */
   // TODO
+  std::vector<Eigen::Vector2f, Eigen::aligned_allocator<Eigen::Vector2f>> scanned_points;
+  scan2eigen(msg_, scanned_points);
 
   /**
    * Set the laser parameters and process the incoming scan through the
    * localizer
    */
   // TODO
+  float range_min = msg_ -> range_min; 
+  float range_max = msg_ -> range_max; 
+  float angle_min = msg_ -> angle_min; 
+  float angle_max = msg_ -> angle_max; 
+  float angle_increment = msg_ -> angle_increment;
+
+  localizer.setLaserParams(range_min, range_max, angle_min, angle_max, angle_increment);
+  localizer.process(scanned_points);
 
   /**
    * Send a transform message between FRAME_WORLD and FRAME_LASER.
@@ -128,6 +138,11 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
   static tf2_ros::TransformBroadcaster br;
   // TODO
 
+  Eigen::Isometry2f laser_world = localizer.X();
+  geometry_msgs::TransformStamped laser_msg;
+  isometry2transformStamped(laser_world, laser_msg, FRAME_WORLD, FRAME_LASER, msg_->header.stamp);
+  br.sendTransform(laser_msg);
+
   /**
    * Send a nav_msgs::Odometry message containing the current laser_in_world
    * transform.
@@ -135,7 +150,10 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
    * TransformStamped message to a nav_msgs::Odometry message.
    */
   // TODO
-
+  nav_msgs::Odometry laser_world_odom;
+  transformStamped2odometry(laser_msg, laser_world_odom);
+  pub_odom_out.publish(laser_world_odom);
+  
   // Sends a copy of msg_ with FRAME_LASER set as frame_id
   // Used to visualize the scan attached to the current laser estimate.
   sensor_msgs::LaserScan out_scan = *msg_;
