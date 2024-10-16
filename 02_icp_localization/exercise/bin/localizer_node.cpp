@@ -31,13 +31,15 @@ Localizer2D localizer;
 int main(int argc, char** argv) {
   // Initialize ROS system
   // TODO
-
+  ros::init(argc, argv, "localizer_node");
+  
   // Create a NodeHandle to manage the node.
   // The namespace of the node is set to global
   ros::NodeHandle nh("/");
 
   // Create shared pointer for the Map object
   // TODO
+  map_ptr = std::make_shared<Map>();
 
   //
   /**
@@ -52,6 +54,13 @@ int main(int argc, char** argv) {
    */
   // TODO
 
+  //Definition of the three requested subscribers
+  ros::Subscriber map_sub = nh.subscribe("/map", 10, callback_map);
+  ros::Subscriber initPose_sub = nh.subscribe("/initialpose", 10, callback_initialpose);
+  ros::Subscriber baseScan_sub = nh.subscribe("/base_scan", 10, callback_scan);
+
+  pub_odom_out = nh.adverstise<nav_msgs::Odometry>("/odom_out", 10);
+  
   // Scan advertiser for visualization purposes
   pub_scan = nh.advertise<sensor_msgs::LaserScan>("/scan_out", 10);
 
@@ -69,6 +78,11 @@ void callback_map(const nav_msgs::OccupancyGridConstPtr& msg_) {
   // Remember to load the map only once during the execution of the map.
 
   // TODO
+  if (map_ptr && !map_ptr->initialized()){
+    map_ptr->loadOccupancyGrid(msg_);
+    ROS_INFO(" **Occupancy Grid Map Loaded!** ");
+    localzier.setMap(map_ptr);
+  }
 }
 
 void callback_initialpose(
@@ -80,6 +94,11 @@ void callback_initialpose(
    */
 
   // TODO
+  geometry_msgs::Pose pose_object = msg_-> pose.pose;
+  Eigen::Isometry2f initial_pose;
+  pose2isometry(pose_object, initial_pose);
+  localizer.setInitialPose(initial_pose);
+  ROS_INFO(" *The initial pose has coordinates: x = %f, y = %f, theta = %f", initial_pose.translation().x(), initial_pose.translation().y(), Eigen::Rotation2Df(initial_pose.linear()).angle());
 }
 
 void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
