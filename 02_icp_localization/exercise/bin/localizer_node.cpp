@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
   ros::Subscriber initPose_sub = nh.subscribe("/initialpose", 10, callback_initialpose); //Subscriber to topic /initialpose to have the initial guess of the robot pose
   ros::Subscriber baseScan_sub = nh.subscribe("/base_scan", 10, callback_scan); //Subscriber to /base_scan to receive the data of the laser scan
 
-  pub_odom_out = nh.adverstise<nav_msgs::Odometry>("/odom_out", 10); //Defines a publisher which publish the updated odometry data in the topic /odom_out, 
+  pub_odom = nh.advertise<nav_msgs::Odometry>("/odom_out", 10); //Defines a publisher which publish the updated odometry data in the topic /odom_out, 
                                                                     // to keep the trace of the robot in the world
   
   // Scan advertiser for visualization purposes
@@ -83,7 +83,7 @@ void callback_map(const nav_msgs::OccupancyGridConstPtr& msg_) {
     map_ptr->loadOccupancyGrid(msg_); // Load the map via the message (nav_msgs::OccupancyGrid)
     ROS_INFO(" **Occupancy Grid Map Loaded!** "); // Print a message in the ROS console to confirm the map
                                                   // has been correctly loaded
-    localzier.setMap(map_ptr); // Print a message to confirm the map is correctly loaded
+    localizer.setMap(map_ptr); // Print a message to confirm the map is correctly loaded
   }
 }
 
@@ -163,7 +163,7 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
   // TODO
   nav_msgs::Odometry laser_world_odom; 
   transformStamped2odometry(laser_msg, laser_world_odom); // Message conversion in an odometry one
-  pub_odom_out.publish(laser_world_odom); // Estimated position in Odometry published on \odom_out topic
+  pub_odom.publish(laser_world_odom); // Estimated position in Odometry published on \odom_out topic
   
   // Sends a copy of msg_ with FRAME_LASER set as frame_id
   // Used to visualize the scan attached to the current laser estimate.

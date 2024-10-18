@@ -41,5 +41,14 @@ target_link_libraries(icp PUBLIC Eigen3::Eigen)
 # - src/ros_bridge.cpp
 # It depends on ROS packages (catkin), Eigen and icp
 
+add_library(localizer2d SHARED src/localizer2d.cpp src/ros_bridge.cpp)
+target_include_directories(localizer2d PUBLIC ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} include)
+target_link_libraries(localizer2d PUBLIC ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} Eigen3::Eigen icp)
+
 # Create rules for the localizer_node (located in bin/localizer_node.cpp)
 # It depends on ROS packages (catkin), Eigen, map and localizer2d
+
+add_executable(localizer_node bin/localizer_node.cpp)
+target_include_directories(localizer_node PRIVATE include ${catkin_INCLUDE_DIRS})
+target_link_libraries(localizer_node PRIVATE ${catkin_LIBRARIES} Eigen3::Eigen map localizer2d)
+
