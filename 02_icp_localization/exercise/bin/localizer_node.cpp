@@ -31,7 +31,7 @@ Localizer2D localizer;
 int main(int argc, char** argv) {
   // Initialize ROS system
   // TODO
-  ros::init(argc, argv, "localizer_node");
+  ros::init(argc, argv, "localizer_node"); //Inizialization of ROS system for the current node registered as "localizer_node"
   
   // Create a NodeHandle to manage the node.
   // The namespace of the node is set to global
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
 
   // Create shared pointer for the Map object
   // TODO
-  map_ptr = std::make_shared<Map>();
+  map_ptr = std::make_shared<Map>(); //Pointer to handle the Map
 
   //
   /**
@@ -55,11 +55,12 @@ int main(int argc, char** argv) {
   // TODO
 
   //Definition of the three requested subscribers
-  ros::Subscriber map_sub = nh.subscribe("/map", 10, callback_map);
-  ros::Subscriber initPose_sub = nh.subscribe("/initialpose", 10, callback_initialpose);
-  ros::Subscriber baseScan_sub = nh.subscribe("/base_scan", 10, callback_scan);
+  ros::Subscriber map_sub = nh.subscribe("/map", 10, callback_map); //Subscriber to /map to obtain the map data of format Occupancy Grid
+  ros::Subscriber initPose_sub = nh.subscribe("/initialpose", 10, callback_initialpose); //Subscriber to topic /initialpose to have the initial guess of the robot pose
+  ros::Subscriber baseScan_sub = nh.subscribe("/base_scan", 10, callback_scan); //Subscriber to /base_scan to receive the data of the laser scan
 
-  pub_odom_out = nh.adverstise<nav_msgs::Odometry>("/odom_out", 10);
+  pub_odom_out = nh.adverstise<nav_msgs::Odometry>("/odom_out", 10); //Defines a publisher which publish the updated odometry data in the topic /odom_out, 
+                                                                    // to keep the trace of the robot in the world
   
   // Scan advertiser for visualization purposes
   pub_scan = nh.advertise<sensor_msgs::LaserScan>("/scan_out", 10);
@@ -78,10 +79,11 @@ void callback_map(const nav_msgs::OccupancyGridConstPtr& msg_) {
   // Remember to load the map only once during the execution of the map.
 
   // TODO
-  if (map_ptr && !map_ptr->initialized()){
-    map_ptr->loadOccupancyGrid(msg_);
-    ROS_INFO(" **Occupancy Grid Map Loaded!** ");
-    localzier.setMap(map_ptr);
+  if (map_ptr && !map_ptr->initialized()){ // Check if the map is not inizialized
+    map_ptr->loadOccupancyGrid(msg_); // Load the map via the message (nav_msgs::OccupancyGrid)
+    ROS_INFO(" **Occupancy Grid Map Loaded!** "); // Print a message in the ROS console to confirm the map
+                                                  // has been correctly loaded
+    localzier.setMap(map_ptr); // Print a message to confirm the map is correctly loaded
   }
 }
 
@@ -94,10 +96,14 @@ void callback_initialpose(
    */
 
   // TODO
-  geometry_msgs::Pose pose_object = msg_-> pose.pose;
-  Eigen::Isometry2f initial_pose;
-  pose2isometry(pose_object, initial_pose);
-  localizer.setInitialPose(initial_pose);
+
+  //Converts the ROS message "PoseWithCovarianceStamped" in a trasformation matrix 
+  // which represents the rigid rototraslation of the robot in 2d (Isometry)
+  geometry_msgs::Pose pose_object = msg_-> pose.pose; //Pose extraction from the messahe
+  Eigen::Isometry2f initial_pose; // This variable represents a rigid transformation (rototraslation)
+  pose2isometry(pose_object, initial_pose); //Pose2isometry (defined in ros_bridge.h) to execute the conversion
+  localizer.setInitialPose(initial_pose); // Set the initial pose in the localizer. ICP starts with that
+  //Print the coordinates of the inizial pose of the robot in the localizer (included translarion and rotations)
   ROS_INFO(" *The initial pose has coordinates: x = %f, y = %f, theta = %f", initial_pose.translation().x(), initial_pose.translation().y(), Eigen::Rotation2Df(initial_pose.linear()).angle());
 }
 
@@ -107,22 +113,27 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
    * [std::vector<Eigen::Vector2f, Eigen::aligned_allocator<Eigen::Vector2f>>]
    */
   // TODO
+
+  // Conversion of the scan data into a points vector
   std::vector<Eigen::Vector2f, Eigen::aligned_allocator<Eigen::Vector2f>> scanned_points;
-  scan2eigen(msg_, scanned_points);
+  scan2eigen(msg_, scanned_points); // Points' coordinates extraction
 
   /**
    * Set the laser parameters and process the incoming scan through the
    * localizer
    */
   // TODO
+
+  // Parameters Extraction of the laser scan, included min/max range/angle and the angle increment
   float range_min = msg_ -> range_min; 
   float range_max = msg_ -> range_max; 
   float angle_min = msg_ -> angle_min; 
   float angle_max = msg_ -> angle_max; 
   float angle_increment = msg_ -> angle_increment;
 
+  // Set those parameters in the localizer
   localizer.setLaserParams(range_min, range_max, angle_min, angle_max, angle_increment);
-  localizer.process(scanned_points);
+  localizer.process(scanned_points); // Send the scanned points to the localizer for the alignment and pose updating process
 
   /**
    * Send a transform message between FRAME_WORLD and FRAME_LASER.
@@ -138,10 +149,10 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
   static tf2_ros::TransformBroadcaster br;
   // TODO
 
-  Eigen::Isometry2f laser_world = localizer.X();
+  Eigen::Isometry2f laser_world = localizer.X(); // Gets the current pose of the laser wrt the world with the localizer
   geometry_msgs::TransformStamped laser_msg;
-  isometry2transformStamped(laser_world, laser_msg, FRAME_WORLD, FRAME_LASER, msg_->header.stamp);
-  br.sendTransform(laser_msg);
+  isometry2transformStamped(laser_world, laser_msg, FRAME_WORLD, FRAME_LASER, msg_->header.stamp); // Converts the pose in a ROS message
+  br.sendTransform(laser_msg); // Sends the transformation between FRAME_WORLD and FRAME_LASER
 
   /**
    * Send a nav_msgs::Odometry message containing the current laser_in_world
@@ -150,9 +161,9 @@ void callback_scan(const sensor_msgs::LaserScanConstPtr& msg_) {
    * TransformStamped message to a nav_msgs::Odometry message.
    */
   // TODO
-  nav_msgs::Odometry laser_world_odom;
-  transformStamped2odometry(laser_msg, laser_world_odom);
-  pub_odom_out.publish(laser_world_odom);
+  nav_msgs::Odometry laser_world_odom; 
+  transformStamped2odometry(laser_msg, laser_world_odom); // Message conversion in an odometry one
+  pub_odom_out.publish(laser_world_odom); // Estimated position in Odometry published on \odom_out topic
   
   // Sends a copy of msg_ with FRAME_LASER set as frame_id
   // Used to visualize the scan attached to the current laser estimate.

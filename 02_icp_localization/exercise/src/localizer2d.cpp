@@ -23,27 +23,28 @@ void Localizer2D::setMap(std::shared_ptr<Map> map_) {
    */
   // TODO
   //Check if the map is initialized and inizialization of rows and cols
-  if (_map && _map -> initialized()){
-    int rows = _map -> rows();
+  if (_map && _map -> initialized()){ // Checks if the map has been inizialized
+    int rows = _map -> rows(); // If so, the data (rows and cols) are here extracted
     int cols = _map -> cols();
-    _obst_vect.clear();
+    _obst_vect.clear(); // Empty the vector to avoid duplications
 
     for (size_t r = 0; r<rows; ++r){
       for (size_t c = 0; c<cols; ++c){
 
-        //Check if it is an obstacle
-        if ((*_map)(r,c) == CellType::Occupied){
-          Eigen::Vector2f wp = _map -> grid2world(cv::Point2i(r,c));
-          _obst_vect.push_back(wp);
+        //Check if it is an obstacle for every line and every col
+        if ((*_map)(r,c) == CellType::Occupied){ // If it is an obstacle...
+          Eigen::Vector2f wp = _map -> grid2world(cv::Point2i(r,c)); // Conversion from grid to world coords
+          _obst_vect.push_back(wp); // I add those coordinates to the vector (in world coords)
         }
-        else {
-          continue;
+        else { // If it is not an obstacle, ...
+          continue; // ... keep searching
         }
       }
     }
   }
   // Create KD-Tree
   // TODO
+  // Creation of KD Tree from the vector _obst_vect
   _obst_tree_ptr = std::make_shared<TreeType>(_obst_vect.begin(), _obst_vect.end());
 }
 
@@ -54,7 +55,7 @@ void Localizer2D::setMap(std::shared_ptr<Map> map_) {
  */
 void Localizer2D::setInitialPose(const Eigen::Isometry2f& initial_pose_) {
   // TODO
-  _laser_in_world = initial_pose_;
+  _laser_in_world = initial_pose_; // Setting the laser scan as the initial pose in world coords to start ICP
 }
 
 /**
@@ -67,7 +68,7 @@ void Localizer2D::process(const ContainerType& scan_) {
   // Use initial pose to get a synthetic scan to compare with scan_
   // TODO
   ContainerType pred_scan;
-  getPrediction(pred_scan);
+  getPrediction(pred_scan); // This function generates a predicted scan from the estimated pose and the map
 
   /**
    * Align prediction and scan_ using ICP.
@@ -75,12 +76,11 @@ void Localizer2D::process(const ContainerType& scan_) {
    * solver X before running ICP)
    */
   // TODO
-
-  int min_points = 10;
-  int num_iter = 30;
-  ICP icp(pred_scan, scan_, min_points);
-  icp.X() = _laser_in_world;
-  icp.run(num_iter);
+  // ICP exection
+  ICP icp(pred_scan, scan_, 10); // Creating the instance of the ICP class. 
+                                // 10 is the MIN NUMBER OF REQUESTED POINTS FOR THE ICP ALIGNMENT
+  icp.X() = _laser_in_world; // Setting the initial pose as initial guess for ICP
+  icp.run(30); // Actual execution of the algo. 30 is the NUMBER OF ITERATIONS
 
   /**
    * Store the solver result (X) as the new laser_in_world estimate
@@ -88,7 +88,7 @@ void Localizer2D::process(const ContainerType& scan_) {
    */
   // TODO
 
-  _laser_in_world = icp.X();
+  _laser_in_world = icp.X(); // Updating the estimated pose of the robot with the ICP result
   
 }
 
@@ -132,4 +132,31 @@ void Localizer2D::getPrediction(ContainerType& prediction_) {
    * You may use additional sensor's informations to refine the prediction.
    */
   // TODO
+  float radius = 20;
+  std::vector<PointType*> neighbors;
+
+  // Extraction of x,y in the world coords
+  float x_l = _laser_in_world.translation().x(); 
+  float y_l = _laser_in_world.translation().y();
+
+  // Searching all the obtacles around the current position within a radius
+  // of 20 from the coordinates found
+  _obst_tree_ptr->fullSearch(neighbors, Eigen::Vector2f(x_l, y_l), radius);
+
+
+  // For each obstacle found, the eclidean distance and the angle wrt the c
+  // current pose fo the robot are computed
+  for(const auto& n:neighbors){
+    float x_n = n->x();
+    float y_n = n->y();
+    float difference_x = x_l - x_n;
+    float difference_y = y_l - y_n;
+    float euc_dist = sqrt(std::pow(difference_x,2) + std::pow(difference_y,2));
+    float alpha = std::atan2(difference_y, difference_x);
+
+    // If the distance and the angle of the obstacle are within the laser params ... 
+    if((_range_min <= euc_dist && euc_dist <= _range_max) && (alpha >= _angle_min && alpha <= _angle_max)){
+      prediction_.push_back(*n); // It adds the obstacle in the predicted scan
+    }
+  }
 }

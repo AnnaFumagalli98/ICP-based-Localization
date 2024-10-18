@@ -31,11 +31,12 @@ void scan2eigen(const sensor_msgs::LaserScan::ConstPtr& msg_,
   float rmax = msg_->range_max;
   const auto ranges = msg_->ranges;
   // TODO: Iterate over the available ranges and fill dest_ accordingly.
-  for (const auto r : ranges) {
-    if (r >= rmin && r <= rmax) {
+  for (const auto r : ranges) { // Iterating on every distance measured by the laser which is within the range
+    if (r >= rmin && r <= rmax) { // Checking if the distance is within the sensor's limits
+      // Adding the points in CARTESIAN COORDINATES to the vector _dest
       dest_.push_back(Eigen::Vector2f(r * cos(a), r * sin(a)));
     }
-    a += ainc;
+    a += ainc; // Updating angle a adding the ainc
   }
 }
 
@@ -101,11 +102,11 @@ void isometry2transformStamped(const Eigen::Isometry2f& pose_,
    */
 
   // TODO Setup the message header
-  msg_.header.frame_id = frame_id_;
-  msg_.header.stamp = stamp_;
+  msg_.header.frame_id = frame_id_; // Representing the reference system (eg. map)
+  msg_.header.stamp = stamp_; // Message Timestamp of when the scan occurrs
 
   // TODO Setup the child_frame_id
-  msg_.child_frame_id = child_frame_id_;
+  msg_.child_frame_id = child_frame_id_; // Reference frame "child" of frame id (eg. robot ref frame)
 
   // TODO Load the translation values in msg_.transform.translation
   msg_.transform.translation.x = pose_.translation().x();
@@ -118,6 +119,7 @@ void isometry2transformStamped(const Eigen::Isometry2f& pose_,
   q.normalize();
 
   // TODO Load the rotation values in msg_.transform.rotation
+  // In EIGEN form
   msg_.transform.rotation.w = q.w();
   msg_.transform.rotation.x = q.x();
   msg_.transform.rotation.y = q.y();
@@ -150,7 +152,7 @@ void transformStamped2odometry(const geometry_msgs::TransformStamped& msg_,
    */
 
   // TODO Setup the message header
-  odom_.header.frame_id = msg_.header.frame_id;
+  odom_.header.frame_id = msg_.header.frame_id; // Copying from TransformStamped->Odometry
   odom_.header.stamp = msg_.header.stamp;
   // TODO Setup the child_frame_id
   odom_.child_frame_id = msg_.child_frame_id;
